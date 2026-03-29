@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-data-pipeline-repair"
+version = "1.0.0"
+description = "OpenEnv-compliant FastAPI environment for data pipeline repair tasks"
+readme = "files/README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.115.0",
+  "uvicorn[standard]==0.30.6",
+  "pydantic==2.8.2",
+  "openai==1.51.0",
+  "openenv-core",
+  "httpx==0.27.2",
+  "requests==2.32.3",
+  "python-multipart==0.0.12",
+]
+
+[project.scripts]
+server = "server.app:main"

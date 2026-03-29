@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "task_id": "easy_null_fix",
+      "score": 1.0,
+      "passed": true,
+      "steps": 3,
+      "total_reward": 1.0
+    },
+    {
+      "task_id": "medium_type_dedup",
+      "score": 1.0,
+      "passed": true,
+      "steps": 5,
+      "total_reward": 1.1
+    },
+    {
+      "task_id": "hard_multi_stage",
+      "score": 1.0,
+      "passed": true,
+      "steps": 7,
+      "total_reward": 1.2
+    }
+  ],
+  "avg_score": 1.0
+}

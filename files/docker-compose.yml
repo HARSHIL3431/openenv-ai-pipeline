@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  env:
+    build: .
+    ports:
+      - "7860:7860"
+    environment:
+      - PORT=7860
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  inference:
+    build: .
+    depends_on:
+      env:
+        condition: service_healthy
+    environment:
+      - ENV_URL=http://env:7860
+      - API_BASE_URL=${API_BASE_URL:-https://router.huggingface.co/v1}
+      - MODEL_NAME=${MODEL_NAME:-mistralai/Mistral-7B-Instruct-v0.3}
+      - HF_TOKEN=${HF_TOKEN:-}
+    command: python -m files.inference
+    profiles:
+      - inference   # only runs when: docker compose --profile inference up
+
+  demo:
+    build: .
+    depends_on:
+      env:
+        condition: service_healthy
+    environment:
+      - ENV_URL=http://env:7860
+    command: python -m files.demo
+    profiles:
+      - demo        # only runs when: docker compose --profile demo up

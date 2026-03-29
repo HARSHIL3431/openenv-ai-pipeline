@@ -1,0 +1,2 @@
+# Placeholder lockfile for OpenEnv validation in environments without uv installed.
+# Regenerate with: uv lock

@@ -1,0 +1,94 @@
+name: data-pipeline-repair-env
+version: "1.0.0"
+tag: openenv
+sdk: docker
+
+description: >
+  An OpenEnv-compliant reinforcement learning environment where an LLM agent
+  diagnoses and repairs broken data pipelines. The agent observes pipeline
+  state (errors, schema, logs, data samples), selects structured repair
+  actions, and receives partial rewards for each correct step.
+
+domain: data-engineering
+real_world: true
+
+tasks:
+  - id: easy_null_fix
+    difficulty: easy
+    description: Fix NULL values in the 'age' column, then validate the pipeline.
+    max_steps: 5
+    passing_score: 0.8
+
+  - id: medium_type_dedup
+    difficulty: medium
+    description: Fix wrong dtype on 'salary' column and remove 20 duplicate rows.
+    max_steps: 8
+    passing_score: 0.8
+
+  - id: hard_multi_stage
+    difficulty: hard
+    description: >
+      Repair three concurrent failures: mixed date formats, missing schema column,
+      and a broken downstream SQL query. Must resolve all before validation.
+    max_steps: 12
+    passing_score: 0.8
+
+action_space:
+  type: structured
+  format: json
+  fields:
+    - name: action_type
+      type: enum
+      values:
+        - identify_issue
+        - fix_null
+        - fix_type
+        - fix_schema
+        - drop_duplicates
+        - rewrite_query
+        - normalize_column
+        - validate_pipeline
+        - add_missing_column
+        - fix_date_format
+    - name: target
+      type: string
+      nullable: true
+    - name: value
+      type: string
+      nullable: true
+
+observation_space:
+  fields:
+    - task_id: string
+    - difficulty: enum[easy, medium, hard]
+    - pipeline_stage: enum[ingest, validate, transform, load, done]
+    - errors: list[string]
+    - warnings: list[string]
+    - schema: dict[string, string]
+    - data_sample: object
+    - logs: list[string]
+    - steps_taken: list[string]
+    - steps_remaining: int
+    - done: bool
+    - reward_so_far: float
+
+reward:
+  range: [-0.3, 0.5]
+  partial: true
+  grader: deterministic
+  passing_threshold: 0.8
+
+endpoints:
+  reset: POST /reset
+  step: POST /step
+  state: GET /state
+  grade: GET /grade
+  tasks: GET /tasks
+  health: GET /health
+  docs: GET /docs
+
+env_vars:
+  - API_BASE_URL
+  - MODEL_NAME
+  - HF_TOKEN
+  - ENV_URL
