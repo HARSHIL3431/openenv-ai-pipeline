@@ -3,16 +3,23 @@ Delegates execution to files.inference while exposing required env/client interf
 """
 
 import os
+from dotenv import load_dotenv
 from openai import OpenAI
 
 # Required environment variable interface for hackathon checks
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "files", ".env"))
+
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "HuggingFaceH4/zephyr-7b-beta")
-HF_TOKEN = os.getenv("HF_TOKEN", "hf_xxxxxxxxxxxxxxxxx")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+if not HF_TOKEN:
+    raise RuntimeError("Missing required environment variable: HF_TOKEN")
 
 client = OpenAI(
-    api_key=os.getenv("HF_TOKEN"),
-    base_url=os.getenv("API_BASE_URL"),
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN,
 )
 
 # Keep files.inference compatibility by ensuring defaults are present

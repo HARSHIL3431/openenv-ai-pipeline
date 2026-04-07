@@ -15,29 +15,28 @@ import os
 import json
 import sys
 import requests
+from dotenv import load_dotenv
 from openai import OpenAI
 
 # ─────────────────────────────────────────────
 # Config
 # ─────────────────────────────────────────────
-def required_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
+load_dotenv()
 
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
+ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
 
-API_BASE_URL = required_env("API_BASE_URL")
-MODEL_NAME = required_env("MODEL_NAME")
-HF_TOKEN = required_env("HF_TOKEN")
-ENV_URL = required_env("ENV_URL")
+if not HF_TOKEN:
+    raise RuntimeError("Missing required environment variable: HF_TOKEN")
 
 TASKS = ["easy_null_fix", "medium_type_dedup", "hard_multi_stage"]
 MAX_STEPS = 12
 
 client = OpenAI(
-    api_key=os.getenv("HF_TOKEN"),
-    base_url=os.getenv("API_BASE_URL"),
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN,
 )
 
 
@@ -109,16 +108,18 @@ What is your next action?"""
 
 
 def llm_action(obs: dict) -> dict:
+    user_prompt = obs_to_prompt(obs)
+    system_prompt = SYSTEM_PROMPT
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": obs_to_prompt(obs)},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
     ]
     try:
         response = client.chat.completions.create(
-            model=os.getenv("MODEL_NAME"),
+            model=MODEL_NAME,
             messages=messages,
-            max_tokens=150,
-            temperature=0.0,
+            temperature=0.2,
+            max_tokens=200,
         )
         raw = response.choices[0].message.content.strip()
         # Strip markdown fences if present
@@ -131,11 +132,8 @@ def llm_action(obs: dict) -> dict:
         action.setdefault("target", None)
         action.setdefault("value", None)
         return action
-    except Exception as e:
-        raise RuntimeError(
-            f"LLM API call failed for model '{MODEL_NAME}' at '{API_BASE_URL}'. "
-            f"Check HF_TOKEN, API_BASE_URL, and MODEL_NAME. Error: {e}"
-        ) from e
+    except Exception:
+        return fallback_action(obs)
 
 
 def fallback_action(obs: dict) -> dict:
