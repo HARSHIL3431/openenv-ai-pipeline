@@ -10,22 +10,17 @@ from openai import OpenAI
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), "files", ".env"))
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
-
-if not HF_TOKEN:
-    raise RuntimeError("Missing required environment variable: HF_TOKEN")
+API_BASE_URL = os.environ["API_BASE_URL"]
+model = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=HF_TOKEN,
+    api_key=os.environ["API_KEY"],
 )
 
 # Keep files.inference compatibility by ensuring defaults are present
 os.environ.setdefault("API_BASE_URL", API_BASE_URL)
-os.environ.setdefault("MODEL_NAME", MODEL_NAME)
-os.environ.setdefault("HF_TOKEN", HF_TOKEN)
+os.environ.setdefault("MODEL_NAME", model)
 os.environ.setdefault("ENV_URL", os.getenv("ENV_URL", "http://localhost:7860"))
 
 from files.inference import run_task

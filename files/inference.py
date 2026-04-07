@@ -1,15 +1,4 @@
-"""
-inference.py — OpenEnv compliant LLM agent runner.
-
-Reads env vars:
-    API_BASE_URL  — OpenAI-compatible API base endpoint (required)
-    MODEL_NAME    — model identifier (required)
-    HF_TOKEN      — Hugging Face token used as API key (required)
-    ENV_URL       — Base URL of the running environment API (required)
-
-Usage:
-  python inference.py
-"""
+"""OpenEnv compliant LLM agent runner."""
 
 import os
 import json
@@ -23,20 +12,16 @@ from openai import OpenAI
 # ─────────────────────────────────────────────
 load_dotenv()
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_BASE_URL = os.environ["API_BASE_URL"]
+model = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
-
-if not HF_TOKEN:
-    raise RuntimeError("Missing required environment variable: HF_TOKEN")
 
 TASKS = ["easy_null_fix", "medium_type_dedup", "hard_multi_stage"]
 MAX_STEPS = 12
 
 client = OpenAI(
     base_url=API_BASE_URL,
-    api_key=HF_TOKEN,
+    api_key=os.environ["API_KEY"],
 )
 
 
@@ -114,68 +99,22 @@ def llm_action(obs: dict) -> dict:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.2,
-            max_tokens=200,
-        )
-        raw = response.choices[0].message.content.strip()
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1].strip()
-            if raw.startswith("json"):
-                raw = raw[4:].strip()
-        action = json.loads(raw)
-        # Normalise nulls
-        action.setdefault("target", None)
-        action.setdefault("value", None)
-        return action
-    except Exception:
-        return fallback_action(obs)
-
-
-def fallback_action(obs: dict) -> dict:
-    """Deterministic fallback when LLM API is unavailable."""
-    plans = {
-        "easy_null_fix": [
-            {"action_type": "identify_issue", "target": "age", "value": None},
-            {"action_type": "fix_null", "target": "age", "value": "0"},
-            {"action_type": "validate_pipeline", "target": None, "value": None},
-        ],
-        "medium_type_dedup": [
-            {"action_type": "identify_issue", "target": "salary", "value": None},
-            {"action_type": "fix_type", "target": "salary", "value": "float"},
-            {"action_type": "identify_issue", "target": "duplicates", "value": None},
-            {"action_type": "drop_duplicates", "target": None, "value": None},
-            {"action_type": "validate_pipeline", "target": None, "value": None},
-        ],
-        "hard_multi_stage": [
-            {"action_type": "identify_issue", "target": "created_at", "value": None},
-            {"action_type": "fix_date_format", "target": "created_at", "value": None},
-            {"action_type": "identify_issue", "target": "region", "value": None},
-            {"action_type": "add_missing_column", "target": "region", "value": None},
-            {"action_type": "identify_issue", "target": "query", "value": None},
-            {"action_type": "rewrite_query", "target": None, "value": None},
-            {"action_type": "validate_pipeline", "target": None, "value": None},
-        ],
-    }
-
-    task_id = obs.get("task_id")
-    taken = set(obs.get("steps_taken", []))
-
-    def step_key(action: dict) -> str:
-        target = action.get("target")
-        if target:
-            return f"{action['action_type']}:{target}"
-        return action["action_type"]
-
-    for action in plans.get(task_id, []):
-        if step_key(action) not in taken:
-            return action
-
-    return {"action_type": "validate_pipeline", "target": None, "value": None}
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+    )
+    raw = response.choices[0].message.content.strip()
+    # Strip markdown fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1].strip()
+        if raw.startswith("json"):
+            raw = raw[4:].strip()
+    action = json.loads(raw)
+    # Normalise nulls
+    action.setdefault("target", None)
+    action.setdefault("value", None)
+    return action
 
 
 # ─────────────────────────────────────────────
@@ -193,10 +132,7 @@ def run_task(task_id: str) -> dict:
 
     while not done and step_num < MAX_STEPS:
         step_num += 1
-        try:
-            action = llm_action(obs)
-        except Exception as e:
-            action = fallback_action(obs)
+        action = llm_action(obs)
 
         result = env_step(session_id, action)
         obs = result["observation"]
@@ -220,7 +156,7 @@ def run_task(task_id: str) -> dict:
 
 def main():
     print("Data Pipeline Repair Environment — Inference Runner")
-    print(f"Model:   {MODEL_NAME}")
+    print(f"Model:   {model}")
     print(f"API:     {API_BASE_URL}")
     print(f"Env URL: {ENV_URL}")
 
@@ -239,8 +175,6 @@ def main():
     avg_score = sum(r["score"] for r in results) / len(results)
     print(f"\n  Average score: {avg_score:.4f}")
     print(f"  Tasks passed:  {sum(1 for r in results if r['passed'])}/{len(results)}")
-
-    return {"results": results, "avg_score": avg_score}
 
     return 0 if all(r["passed"] for r in results) else 1
 
