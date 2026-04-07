@@ -363,6 +363,139 @@ TASK_REGISTRY: Dict[str, BaseTask] = {
     HardTask.task_id: HardTask(),
 }
 
+
+def _extract_steps_and_stage(state: Any) -> tuple[list[str], PipelineStage]:
+    """Best-effort extraction that accepts dict, Observation, or StepResult-like payloads."""
+    if state is None:
+        return [], PipelineStage.validate
+
+    obs = state
+    if isinstance(state, dict) and "observation" in state and isinstance(state["observation"], dict):
+        obs = state["observation"]
+    elif hasattr(state, "observation"):
+        obs = getattr(state, "observation")
+
+    if isinstance(obs, dict):
+        steps_taken = list(obs.get("steps_taken", []))
+        stage_value = obs.get("pipeline_stage", PipelineStage.validate)
+    else:
+        steps_taken = list(getattr(obs, "steps_taken", []))
+        stage_value = getattr(obs, "pipeline_stage", PipelineStage.validate)
+
+    if isinstance(stage_value, PipelineStage):
+        stage = stage_value
+    else:
+        try:
+            stage = PipelineStage(stage_value)
+        except Exception:
+            stage = PipelineStage.validate
+
+    return steps_taken, stage
+
+
+def grade_easy_task(state: Any) -> float:
+    try:
+        steps_taken, stage = _extract_steps_and_stage(state)
+        return float(TASK_REGISTRY[EasyTask.task_id].grade(steps_taken, stage).score)
+    except Exception:
+        return 0.0
+
+
+def grade_medium_task(state: Any) -> float:
+    try:
+        steps_taken, stage = _extract_steps_and_stage(state)
+        return float(TASK_REGISTRY[MediumTask.task_id].grade(steps_taken, stage).score)
+    except Exception:
+        return 0.0
+
+
+def grade_hard_task(state: Any) -> float:
+    try:
+        steps_taken, stage = _extract_steps_and_stage(state)
+        return float(TASK_REGISTRY[HardTask.task_id].grade(steps_taken, stage).score)
+    except Exception:
+        return 0.0
+
+
+class _BaseRegistryEnv:
+    """Minimal task-local environment adapter for validator compatibility."""
+
+    task_id: str
+
+    def __init__(self):
+        self._task = TASK_REGISTRY[self.task_id]
+        self._obs = self._task.initial_observation()
+
+    def reset(self) -> dict:
+        self._obs = self._task.initial_observation()
+        return self.state()
+
+    def step(self, action: Any) -> dict:
+        from files.models import Action
+
+        if isinstance(action, Action):
+            action_obj = action
+        elif isinstance(action, dict):
+            action_obj = Action(**action)
+        else:
+            raise TypeError("Action must be a dict or Action instance")
+
+        key = action_obj.action_type.value + (f":{action_obj.target}" if action_obj.target else "")
+        steps_taken = list(self._obs.steps_taken)
+        if key not in steps_taken:
+            steps_taken.append(key)
+
+        reward = self._task.reward_for_action(action_obj, {"steps_taken": self._obs.steps_taken})
+        done = action_obj.action_type == ActionType.validate_pipeline
+
+        errors = list(self._obs.errors)
+        if key in {
+            "fix_null:age",
+            "fix_type:salary",
+            "drop_duplicates",
+            "fix_date_format:created_at",
+            "add_missing_column:region",
+            "rewrite_query",
+        }:
+            for token in ["NullValueError", "TypeError", "DuplicateRowError", "DateFormatError", "SchemaError", "QueryError"]:
+                if token in " ".join(errors):
+                    errors = [e for e in errors if token not in e]
+
+        self._obs = self._obs.model_copy(
+            update={
+                "steps_taken": steps_taken,
+                "steps_remaining": max(0, self._obs.steps_remaining - 1),
+                "reward_so_far": round(self._obs.reward_so_far + reward, 4),
+                "done": done,
+                "pipeline_stage": PipelineStage.done if done else self._obs.pipeline_stage,
+                "errors": errors,
+                "warnings": self._obs.warnings if errors else [],
+            }
+        )
+        return {"observation": self.state(), "reward": float(reward), "done": done}
+
+    def state(self) -> dict:
+        return self._obs.model_dump()
+
+
+class EasyTaskEnv(_BaseRegistryEnv):
+    task_id = EasyTask.task_id
+
+
+class MediumTaskEnv(_BaseRegistryEnv):
+    task_id = MediumTask.task_id
+
+
+class HardTaskEnv(_BaseRegistryEnv):
+    task_id = HardTask.task_id
+
+
+TASKS: Dict[str, Dict[str, Any]] = {
+    EasyTask.task_id: {"env": EasyTaskEnv, "grader": grade_easy_task},
+    MediumTask.task_id: {"env": MediumTaskEnv, "grader": grade_medium_task},
+    HardTask.task_id: {"env": HardTaskEnv, "grader": grade_hard_task},
+}
+
 def get_task(task_id: str) -> BaseTask:
     if task_id not in TASK_REGISTRY:
         raise ValueError(f"Unknown task_id '{task_id}'. Available: {list(TASK_REGISTRY.keys())}")
