@@ -21,8 +21,8 @@ os.environ.setdefault("MODEL_NAME", MODEL_NAME)
 os.environ.setdefault("HF_TOKEN", HF_TOKEN)
 os.environ.setdefault("ENV_URL", os.getenv("ENV_URL", "http://localhost:7860"))
 
-from files.inference import main
+from files.inference import run_task
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    run_task("easy_null_fix")

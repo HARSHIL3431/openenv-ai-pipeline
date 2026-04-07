@@ -184,13 +184,10 @@ def fallback_action(obs: dict) -> dict:
 # Run all tasks
 # ─────────────────────────────────────────────
 def run_task(task_id: str) -> dict:
-    print(f"\n{'='*60}")
-    print(f"  TASK: {task_id}")
-    print(f"{'='*60}")
+    task_name = task_id
+    print(f"[START] task={task_name}", flush=True)
 
     session_id, obs = env_reset(task_id)
-    print(f"Session: {session_id}")
-    print(f"Errors at start: {obs['errors']}")
 
     step_num = 0
     done = False
@@ -201,30 +198,22 @@ def run_task(task_id: str) -> dict:
         try:
             action = llm_action(obs)
         except Exception as e:
-            print(f"  [step {step_num}] LLM call failed: {e}")
             action = fallback_action(obs)
-            print(f"  [step {step_num}] Using fallback action: {action}")
-
-        print(f"  [step {step_num}] Action: {action}")
 
         result = env_step(session_id, action)
         obs = result["observation"]
         reward = result["reward"]
         done = result["done"]
         total_reward += reward
-
-        print(f"           Reward: {reward:+.2f}  |  Cumulative: {total_reward:.2f}  |  Done: {done}")
-        if obs["errors"]:
-            print(f"           Remaining errors: {obs['errors']}")
+        print(f"[STEP] step={step_num} reward={reward}", flush=True)
 
     grade = env_grade(session_id)
-    print(f"\n  GRADE: {grade['score']:.4f}  |  Passed: {grade['passed']}")
-    print(f"  Feedback: {grade['feedback']}")
-    print(f"  Breakdown: {grade['breakdown']}")
+    final_score = grade["score"]
+    print(f"[END] task={task_name} score={final_score} steps={step_num}", flush=True)
 
     return {
         "task_id": task_id,
-        "score": grade["score"],
+        "score": final_score,
         "passed": grade["passed"],
         "steps": step_num,
         "total_reward": round(total_reward, 4),
@@ -253,10 +242,7 @@ def main():
     print(f"\n  Average score: {avg_score:.4f}")
     print(f"  Tasks passed:  {sum(1 for r in results if r['passed'])}/{len(results)}")
 
-    # Write results JSON
-    with open("inference_results.json", "w") as f:
-        json.dump({"results": results, "avg_score": avg_score}, f, indent=2)
-    print("\n  Results saved to inference_results.json")
+    return {"results": results, "avg_score": avg_score}
 
     return 0 if all(r["passed"] for r in results) else 1
 
