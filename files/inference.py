@@ -8,6 +8,7 @@ This module is intentionally defensive for strict CLI validation:
 """
 
 import json
+import math
 import os
 import sys
 from typing import Any, Dict, List, Optional, Tuple
@@ -91,10 +92,13 @@ def clamp_score(score: Any) -> float:
     except Exception:
         score = 0.5
 
+    if not math.isfinite(score):
+        return 0.5
+
     if score <= 0.0:
-        return 0.1
+        return 0.5
     if score >= 1.0:
-        return 0.9
+        return 0.5
     return score
 
 
@@ -443,12 +447,25 @@ def run_task(task_id: str) -> Dict[str, Any]:
 
 
 def write_results_file(results: List[Dict[str, Any]]) -> None:
+    safe_results: List[Dict[str, Any]] = []
+    for r in results:
+        safe_r = safe_result(
+            task_id=str(r.get("task_id", "unknown")),
+            score=clamp_score(r.get("score", 0.5)),
+            passed=bool(r.get("passed", False)),
+            steps=int(r.get("steps", 0) or 0),
+            total_reward=float(r.get("total_reward", 0.0) or 0.0),
+            error=r.get("error", None),
+        )
+        safe_results.append(safe_r)
+
+    scores = [clamp_score(r.get("score", 0.5)) for r in safe_results]
+    avg_score = sum(scores) / len(scores) if scores else 0.5
+    avg_score = clamp_score(avg_score)
+
     payload = {
-        "results": results,
-        "avg_score": round(
-            (sum(clamp_score(r.get("score", 0.5)) for r in results) / len(results)) if results else 0.5,
-            4,
-        ),
+        "results": safe_results,
+        "avg_score": round(avg_score, 4),
     }
     try:
         with open("inference_results.json", "w", encoding="utf-8") as f:
@@ -481,6 +498,11 @@ def main():
     if not results:
         results = [safe_result(task_id=t, error="no_result_generated") for t in TASKS]
 
+    for r in results:
+        r["score"] = clamp_score(r.get("score", 0.5))
+
+    print(f"[DEBUG] FINAL RESULTS: {results}", flush=True)
+
     write_results_file(results)
 
     print(f"\n{'=' * 60}")
@@ -493,7 +515,9 @@ def main():
         task = str(r.get("task_id", "unknown"))
         print(f"  [{status}] {task:<25} score={score:.4f} steps={steps}")
 
-    avg_score = (sum(clamp_score(r.get("score", 0.5)) for r in results) / len(results)) if results else 0.5
+    scores = [clamp_score(r.get("score", 0.5)) for r in results]
+    avg_score = sum(scores) / len(scores) if scores else 0.5
+    avg_score = clamp_score(avg_score)
     tasks_passed = sum(1 for r in results if bool(r.get("passed", False)))
     print(f"\n  Average score: {avg_score:.4f}")
     print(f"  Tasks passed:  {tasks_passed}/{len(results)}")

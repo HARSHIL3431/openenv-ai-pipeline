@@ -4,6 +4,10 @@ No external services required. Tests graders, rewards, and state transitions.
 """
 
 import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from files.models import Action, ActionType, DifficultyLevel, ResetRequest
 from files.environment import SessionManager

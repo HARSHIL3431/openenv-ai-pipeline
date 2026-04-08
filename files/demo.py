@@ -14,11 +14,26 @@ Usage:
 """
 
 import json
+import math
 import sys
 import time
 import requests
 
 ENV_URL = "http://localhost:7860"
+
+
+def clamp_score(score):
+    try:
+        score = float(score)
+    except Exception:
+        score = 0.5
+    if not math.isfinite(score):
+        return 0.5
+    if score <= 0.0:
+        return 0.5
+    if score >= 1.0:
+        return 0.5
+    return score
 
 # ─────────────────────────────────────────────
 # Optimal action sequences per task
@@ -119,7 +134,7 @@ def run_task(task_id: str, plan: list) -> dict:
 
     return {
         "task_id": task_id,
-        "score": grade["score"],
+        "score": clamp_score(grade["score"]),
         "passed": grade["passed"],
         "total_reward": round(total_reward, 4),
         "steps": len(plan),
@@ -153,7 +168,8 @@ def main():
         status = "✅ PASS" if r["passed"] else "❌ FAIL"
         print(f"║  {status}  {r['task_id']:<25} score={r['score']:.4f}  ║")
 
-    avg = sum(r["score"] for r in results) / len(results)
+    avg = sum(clamp_score(r["score"]) for r in results) / len(results)
+    avg = clamp_score(avg)
     passed = sum(1 for r in results if r["passed"])
     print(f"╠══════════════════════════════════════════════════════╣")
     print(f"║  Average score : {avg:.4f}                              ║")

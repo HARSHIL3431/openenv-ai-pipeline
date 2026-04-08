@@ -2,25 +2,28 @@
   "results": [
     {
       "task_id": "easy_null_fix",
-      "score": 1.0,
+      "score": 0.75,
       "passed": true,
-      "steps": 3,
-      "total_reward": 1.0
+      "steps": 1,
+      "total_reward": 0.35,
+      "error": null
     },
     {
       "task_id": "medium_type_dedup",
-      "score": 1.0,
+      "score": 0.75,
       "passed": true,
-      "steps": 5,
-      "total_reward": 1.1
+      "steps": 1,
+      "total_reward": 0.35,
+      "error": null
     },
     {
       "task_id": "hard_multi_stage",
-      "score": 1.0,
+      "score": 0.75,
       "passed": true,
-      "steps": 7,
-      "total_reward": 1.2
+      "steps": 1,
+      "total_reward": 0.35,
+      "error": null
     }
   ],
-  "avg_score": 1.0
+  "avg_score": 0.75
 }
