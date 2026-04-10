@@ -24,7 +24,10 @@ except Exception:  # pragma: no cover - fallback path for missing client depende
 # ─────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", None)
 MODEL_NAME = os.getenv("MODEL_NAME", None) or "gpt-4o-mini"
-ENV_URL = os.getenv("ENV_URL", None) or "http://localhost:7860"
+ENV_URL = os.getenv(
+    "ENV_URL",
+    "https://harshil3431-openenv-ai-pipeline.hf.space"
+)
 ENV_TIMEOUT_SECONDS = 10
 LLM_TIMEOUT_SECONDS = 20
 
