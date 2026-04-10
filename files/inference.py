@@ -433,6 +433,7 @@ def run_task(task_id: str) -> Dict[str, Any]:
         passed = True
 
     final_score = clamp_score(final_score)
+    final_score = max(0.01, min(0.99, float(final_score)))
 
     print(f"[END] task={task_name} score={final_score} steps={step_num}", flush=True)
 
