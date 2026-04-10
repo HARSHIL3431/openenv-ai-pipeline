@@ -432,12 +432,7 @@ def run_task(task_id: str) -> Dict[str, Any]:
         total_reward = max(total_reward, 0.1)
         passed = True
 
-    final_score = clamp_score(final_score)
-    final_score = max(0.01, min(0.99, float(final_score)))
-
-    print(f"[END] task={task_name} score={final_score} steps={step_num}", flush=True)
-
-    return safe_result(
+    final_result = safe_result(
         task_id=task_id,
         score=final_score,
         passed=passed,
@@ -445,27 +440,36 @@ def run_task(task_id: str) -> Dict[str, Any]:
         total_reward=round(total_reward, 4),
     )
 
+    print(f"[END] task={task_name} score={final_result['score']} steps={step_num}", flush=True)
+
+    return final_result
+
 
 def write_results_file(results: List[Dict[str, Any]]) -> None:
     safe_results: List[Dict[str, Any]] = []
     for r in results:
         safe_r = safe_result(
             task_id=str(r.get("task_id", "unknown")),
-            score=clamp_score(r.get("score", 0.5)),
+            score=r.get("score", 0.5),
             passed=bool(r.get("passed", False)),
             steps=int(r.get("steps", 0) or 0),
             total_reward=float(r.get("total_reward", 0.0) or 0.0),
             error=r.get("error", None),
         )
+        safe_r["score"] = clamp_score(safe_r.get("score", 0.5))
+        safe_r["score"] = round(float(safe_r["score"]), 4)
+        safe_r["score"] = clamp_score(safe_r["score"])
         safe_results.append(safe_r)
 
     scores = [clamp_score(r.get("score", 0.5)) for r in safe_results]
     avg_score = sum(scores) / len(scores) if scores else 0.5
     avg_score = clamp_score(avg_score)
+    avg_score = round(float(avg_score), 4)
+    avg_score = clamp_score(avg_score)
 
     payload = {
         "results": safe_results,
-        "avg_score": round(avg_score, 4),
+        "avg_score": avg_score,
     }
     try:
         with open("inference_results.json", "w", encoding="utf-8") as f:
@@ -500,6 +504,10 @@ def main():
 
     for r in results:
         r["score"] = clamp_score(r.get("score", 0.5))
+        r["score"] = round(float(r["score"]), 4)
+        r["score"] = clamp_score(r["score"])
+
+    print(f"FINAL SCORES: {[r.get('score', 0.5) for r in results]}", flush=True)
 
     print(f"[DEBUG] FINAL RESULTS: {results}", flush=True)
 
@@ -518,6 +526,9 @@ def main():
     scores = [clamp_score(r.get("score", 0.5)) for r in results]
     avg_score = sum(scores) / len(scores) if scores else 0.5
     avg_score = clamp_score(avg_score)
+    avg_score = round(float(avg_score), 4)
+    avg_score = clamp_score(avg_score)
+    print(f"AVG SCORE: {avg_score}", flush=True)
     tasks_passed = sum(1 for r in results if bool(r.get("passed", False)))
     print(f"\n  Average score: {avg_score:.4f}")
     print(f"  Tasks passed:  {tasks_passed}/{len(results)}")
