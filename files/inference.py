@@ -95,11 +95,7 @@ def clamp_score(score: Any) -> float:
     if not math.isfinite(score):
         return 0.5
 
-    if score <= 0.0:
-        return 0.5
-    if score >= 1.0:
-        return 0.5
-    return score
+    return max(0.01, min(0.99, score))
 
 
 def safe_result(task_id: str, **overrides: Any) -> Dict[str, Any]:

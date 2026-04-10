@@ -29,11 +29,7 @@ def clamp_score(score):
         score = 0.5
     if not math.isfinite(score):
         return 0.5
-    if score <= 0.0:
-        return 0.5
-    if score >= 1.0:
-        return 0.5
-    return score
+    return max(0.01, min(0.99, score))
 
 # ─────────────────────────────────────────────
 # Optimal action sequences per task
@@ -122,10 +118,11 @@ def run_task(task_id: str, plan: list) -> dict:
     r = requests.get(f"{ENV_URL}/grade", params={"session_id": session_id})
     r.raise_for_status()
     grade = r.json()
+    final_score = clamp_score(grade["score"])
 
     status = "✅ PASS" if grade["passed"] else "❌ FAIL"
     print()
-    print(f"  {status}  score={grade['score']:.4f}  total_reward={total_reward:.2f}")
+    print(f"  {status}  score={final_score:.4f}  total_reward={total_reward:.2f}")
     print(f"  Feedback: {grade['feedback']}")
     print(f"  Breakdown:")
     for k, v in grade["breakdown"].items():
@@ -134,7 +131,7 @@ def run_task(task_id: str, plan: list) -> dict:
 
     return {
         "task_id": task_id,
-        "score": clamp_score(grade["score"]),
+        "score": final_score,
         "passed": grade["passed"],
         "total_reward": round(total_reward, 4),
         "steps": len(plan),
